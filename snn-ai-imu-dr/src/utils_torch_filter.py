@@ -6,7 +6,12 @@ import time
 from termcolor import cprint
 from utils_numpy_filter import NUMPYIEKF
 from utils import prepare_data
-
+import snntorch as snn
+from snntorch import surrogate
+from snntorch import backprop
+from snntorch import functional as SF
+from snntorch import utils
+from snntorch import spikeplot as splt
 class InitProcessCovNet(torch.nn.Module):
 
         def __init__(self):
@@ -43,16 +48,20 @@ class MesNet(torch.nn.Module):
             super(MesNet, self).__init__()
             self.beta_measurement = 3*torch.ones(2).double()
             self.tanh = torch.nn.Tanh()
+            self.lif=snn.Leaky(beta=0.5, spike_grad=surrogate.fast_sigmoid(slope=25), init_hidden=True)
+            self.lif_2=snn.Leaky(beta=0.5, spike_grad=surrogate.fast_sigmoid(slope=25), init_hidden=True)
 
-            self.cov_net = torch.nn.Sequential(torch.nn.Conv1d(6, 32, 5),
-                       torch.nn.ReplicationPad1d(4),
-                       torch.nn.ReLU(),
-                       torch.nn.Dropout(p=0.5),
+            self.cov_net_1 = torch.nn.Sequential(
+                            torch.nn.Conv1d(6, 32, 5).double(),
+                            torch.nn.ReplicationPad1d(4).double(),
+                            torch.nn.Dropout(p=0.5).double()                            
+                            )
+            self.cov_net_2=torch.nn.Sequential(
                        torch.nn.Conv1d(32, 32, 5, dilation=3),
-                       torch.nn.ReplicationPad1d(4),
-                       torch.nn.ReLU(),
-                       torch.nn.Dropout(p=0.5),
+                       torch.nn.ReplicationPad1d(4).double(),
+                       torch.nn.Dropout(p=0.5).double()
                        ).double()
+            
             "CNN for measurement covariance"
             self.cov_lin = torch.nn.Sequential(torch.nn.Linear(32, 2),
                                               torch.nn.Tanh(),
@@ -61,7 +70,14 @@ class MesNet(torch.nn.Module):
             self.cov_lin[0].weight.data[:] /= 100
 
         def forward(self, u, iekf):
-            y_cov = self.cov_net(u).transpose(0, 2).squeeze()
+        
+            y_cov = self.cov_net_1(u)
+            y_cov=self.lif(y_cov)
+            y_cov=y_cov.double()
+            y_cov=self.cov_net_2(y_cov)
+            y_cov=self.lif_2(y_cov)
+            y_cov=y_cov.double()
+            y_cov=y_cov.transpose(0, 2).squeeze()
             z_cov = self.cov_lin(y_cov)
             z_cov_net = self.beta_measurement.unsqueeze(0)*z_cov
             measurements_covs = (iekf.cov0_measurement.unsqueeze(0) * (10**z_cov_net))
