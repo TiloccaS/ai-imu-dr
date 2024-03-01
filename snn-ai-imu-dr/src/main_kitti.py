@@ -469,7 +469,7 @@ class KITTIArgs():
         continue_training = False
 
         # choose what to do
-        read_data = 0
+        read_data = 0#devo settare read data a 1 se ho i dati in formato non pickle e quindi devo convertirli in pickle
         train_filter = 1
         test_filter = 1
         results_filter = 1

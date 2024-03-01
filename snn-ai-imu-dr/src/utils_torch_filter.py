@@ -41,27 +41,33 @@ class InitProcessCovNet(torch.nn.Module):
             alpha = self.factor_process_covariance(torch.ones(1).double())
             beta = 10**(self.tanh(alpha))
             return beta
-
+class DoubleLeaky(snn.Leaky):
+    def forward(self, x):
+        output = super(DoubleLeaky, self).forward(x)
+        return output.double()
 
 class MesNet(torch.nn.Module):
         def __init__(self):
             super(MesNet, self).__init__()
             self.beta_measurement = 3*torch.ones(2).double()
             self.tanh = torch.nn.Tanh()
-            self.lif=snn.Leaky(beta=0.5, spike_grad=surrogate.fast_sigmoid(slope=25), init_hidden=True)
-            self.lif_2=snn.Leaky(beta=0.5, spike_grad=surrogate.fast_sigmoid(slope=25), init_hidden=True)
-
-            self.cov_net_1 = torch.nn.Sequential(
-                            torch.nn.Conv1d(6, 32, 5).double(),
-                            torch.nn.ReplicationPad1d(4).double(),
-                            torch.nn.Dropout(p=0.5).double()                            
-                            )
-            self.cov_net_2=torch.nn.Sequential(
-                       torch.nn.Conv1d(32, 32, 5, dilation=3),
-                       torch.nn.ReplicationPad1d(4).double(),
-                       torch.nn.Dropout(p=0.5).double()
-                       ).double()
+            beta = 0.8  # neuron decay rate  #GROUPS : A: [0.7], B: [0.8], C: [0.85], D: [0.9 - 1]
+            grad = surrogate.straight_through_estimator()
             
+            self.neuron1=DoubleLeaky(beta=beta, spike_grad=grad, init_hidden=True,threshold=0.5, learn_beta=True)
+            self.neuron2=DoubleLeaky(beta=beta, spike_grad=grad, init_hidden=True,threshold=0.5,learn_beta=True)
+            self.neuron3=DoubleLeaky(beta=beta, spike_grad=grad, init_hidden=True,threshold=0.5,learn_beta=True)
+
+          
+            self.cov_net = torch.nn.Sequential(torch.nn.Conv1d(6, 32, 5),
+                       torch.nn.ReplicationPad1d(4),
+                       #torch.nn.Dropout(p=0.5),
+                       self.neuron1,
+                       torch.nn.Conv1d(32, 32, 5, dilation=3),
+                       torch.nn.ReplicationPad1d(4),
+                       #torch.nn.Dropout(p=0.5),
+                       self.neuron2
+                       ).double()
             "CNN for measurement covariance"
             self.cov_lin = torch.nn.Sequential(torch.nn.Linear(32, 2),
                                               torch.nn.Tanh(),
@@ -71,13 +77,15 @@ class MesNet(torch.nn.Module):
 
         def forward(self, u, iekf):
         
-            y_cov = self.cov_net_1(u)
-            y_cov=self.lif(y_cov)
-            y_cov=y_cov.double()
-            y_cov=self.cov_net_2(y_cov)
-            y_cov=self.lif_2(y_cov)
-            y_cov=y_cov.double()
-            y_cov=y_cov.transpose(0, 2).squeeze()
+            """ y_cov_1 = self.cov_net_1(u)
+            y_lif=self.lif(y_cov_1)
+            y_lif_double=y_lif.double()
+            y_cov_2=self.cov_net_2(y_lif_double)
+            y_lif_2=self.lif_2(y_cov_2)
+            y_lif2_double=y_lif_2.double()
+            y_cov=y_lif2_double.transpose(0, 2).squeeze()"""
+            y_cov = self.cov_net(u).transpose(0, 2).squeeze()
+            print(torch.count_nonzero(y_cov)/y_cov.numel())
             z_cov = self.cov_lin(y_cov)
             z_cov_net = self.beta_measurement.unsqueeze(0)*z_cov
             measurements_covs = (iekf.cov0_measurement.unsqueeze(0) * (10**z_cov_net))
