@@ -158,6 +158,7 @@ def prepare_loss_data(args, dataset):
 def train_loop(args, dataset, epoch, iekf, optimizer, seq_dim):
     loss_train = 0
     optimizer.zero_grad()
+    
     for i, (dataset_name, Ns) in enumerate(dataset.datasets_train_filter.items()):
         t, ang_gt, p_gt, v_gt, u, N0 = prepare_data_filter(dataset, dataset_name, Ns,
                                                                   iekf, seq_dim)
@@ -177,13 +178,12 @@ def train_loop(args, dataset, epoch, iekf, optimizer, seq_dim):
 
     if loss_train == 0: 
         return 
-    
-    optimizer.zero_grad()
+
     loss_train.backward()  
-
     optimizer.step()
-
-
+  
+    optimizer.zero_grad()
+  
     print('Train Epoch: {:2d} \tLoss: {:.5f}'.format(epoch, loss_train))
 
     return loss_train

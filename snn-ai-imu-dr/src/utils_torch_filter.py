@@ -12,6 +12,7 @@ from snntorch import backprop
 from snntorch import functional as SF
 from snntorch import utils
 from snntorch import spikeplot as splt
+
 class InitProcessCovNet(torch.nn.Module):
 
         def __init__(self):
@@ -43,8 +44,8 @@ class InitProcessCovNet(torch.nn.Module):
             return beta
 class DoubleLeaky(snn.Leaky):
     def forward(self, x):
-        output = super(DoubleLeaky, self).forward(x)
-        return output.double()
+        output = super(DoubleLeaky, self).forward(x).detach().double()
+        return output
 
 class MesNet(torch.nn.Module):
         def __init__(self):
@@ -84,9 +85,13 @@ class MesNet(torch.nn.Module):
             y_lif_2=self.lif_2(y_cov_2)
             y_lif2_double=y_lif_2.double()
             y_cov=y_lif2_double.transpose(0, 2).squeeze()"""
-            y_cov = self.cov_net(u).transpose(0, 2).squeeze()
+            y_cov = self.cov_net(u)
+            y_cov=y_cov.clone()
+            y_cov=y_cov.transpose(0, 2).squeeze()
+
             print(torch.count_nonzero(y_cov)/y_cov.numel())
             z_cov = self.cov_lin(y_cov)
+
             z_cov_net = self.beta_measurement.unsqueeze(0)*z_cov
             measurements_covs = (iekf.cov0_measurement.unsqueeze(0) * (10**z_cov_net))
             return measurements_covs
