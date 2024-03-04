@@ -460,7 +460,7 @@ class KITTIArgs():
         path_results = "../results"
         path_temp = "../temp/temp"
 
-        epochs = 400
+        epochs = 50
         seq_dim = 6000
 
         # training, cross-validation and test dataset
@@ -470,7 +470,7 @@ class KITTIArgs():
 
         # choose what to do
         read_data = 0#devo settare read data a 1 se ho i dati in formato non pickle e quindi devo convertirli in pickle
-        train_filter = 0
+        train_filter = 1
         test_filter = 1
         results_filter = 1
         dataset_class = KITTIDataset

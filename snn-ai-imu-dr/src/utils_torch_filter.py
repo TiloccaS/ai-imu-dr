@@ -12,7 +12,7 @@ from snntorch import backprop
 from snntorch import functional as SF
 from snntorch import utils
 from snntorch import spikeplot as splt
-
+from snntorch.utils import reset
 class InitProcessCovNet(torch.nn.Module):
 
         def __init__(self):
@@ -44,7 +44,10 @@ class InitProcessCovNet(torch.nn.Module):
             return beta
 class DoubleLeaky(snn.Leaky):
     def forward(self, x):
-        output = super(DoubleLeaky, self).forward(x).detach().double()
+
+        output = super(DoubleLeaky, self).forward(x)
+        output=output.clone()
+        output=output.double()
         return output
 
 class MesNet(torch.nn.Module):
@@ -53,7 +56,7 @@ class MesNet(torch.nn.Module):
             self.beta_measurement = 3*torch.ones(2).double()
             self.tanh = torch.nn.Tanh()
             beta = 0.8  # neuron decay rate  #GROUPS : A: [0.7], B: [0.8], C: [0.85], D: [0.9 - 1]
-            grad = surrogate.straight_through_estimator()
+            grad = surrogate.FastSigmoid.apply
             
             self.neuron1=DoubleLeaky(beta=beta, spike_grad=grad, init_hidden=True,threshold=0.5, learn_beta=True)
             self.neuron2=DoubleLeaky(beta=beta, spike_grad=grad, init_hidden=True,threshold=0.5,learn_beta=True)
@@ -85,6 +88,8 @@ class MesNet(torch.nn.Module):
             y_lif_2=self.lif_2(y_cov_2)
             y_lif2_double=y_lif_2.double()
             y_cov=y_lif2_double.transpose(0, 2).squeeze()"""
+            utils.reset(self.cov_net)  # resets hidden states for all LIF neurons in net
+
             y_cov = self.cov_net(u)
             y_cov=y_cov.clone()
             y_cov=y_cov.transpose(0, 2).squeeze()

@@ -43,7 +43,7 @@ def compute_delta_p(Rot, p):
     dp = p[1:] - p[:-1]  #  this must be ground truth
     distances[1:] = dp.norm(dim=1).cumsum(0).numpy()
 
-    seq_lengths = [100, 200, 300, 400, 500, 600, 700, 800]
+    seq_lengths = [100]
     k_max = int(Rot.shape[0] / step_size) - 1
 
     for k in range(0, k_max):
@@ -178,8 +178,12 @@ def train_loop(args, dataset, epoch, iekf, optimizer, seq_dim):
 
     if loss_train == 0: 
         return 
+    
+    loss_train.cuda().backward()  
 
-    loss_train.backward()  
+    g_norm = torch.nn.utils.clip_grad_norm_(iekf.parameters(), max_grad_norm)
+    cprint("gradient norm: {:.5f}".format(g_norm))
+
     optimizer.step()
   
     optimizer.zero_grad()

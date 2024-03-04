@@ -26,7 +26,7 @@ def launch(args):
 
     if args.train_filter:
         train_filter(args, dataset)
-
+        
     if args.test_filter:
         test_filter(args, dataset)
 
